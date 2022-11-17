@@ -1,23 +1,8 @@
-# Python extensions in Rust
+# Rage Against The State Machine (RATS)
 
-![build](https://github.com/kmdouglass/python-rust/actions/workflows/build.yml/badge.svg)
+![build](https://github.com/LEB-EPFL/rats/actions/workflows/build.yml/badge.svg)
 
-Template repo for writing Python extensions in Rust.
-
-Based on documentation at https://www.maturin.rs/index.html.
-
-## Getting started
-
-```console
-$ python -m venv .venv
-$ source .venv/bin/activate
-(.venv) $ pip install .
-(.venv) $ python
->>> from python_lib.main import what_is_the_meaning_of_life
->>> what_is_the_meaning_of_life()
-42
-
-```
+High performance probabilistic state machine simulator
 
 ## Development
 
