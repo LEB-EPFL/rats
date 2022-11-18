@@ -1,8 +1,8 @@
 #[cfg(test)]
-use crate::meaning_of_life;
+use crate::StateMachine;
 
 #[test]
-fn test_meaning_of_life() {
-    let result = meaning_of_life();
-    assert_eq!(42, result);
+fn new_state_machine() {
+    let result = StateMachine::new(0);
+    assert_eq!(result.current_state, 0);
 }
