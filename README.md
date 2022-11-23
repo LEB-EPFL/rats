@@ -1,4 +1,4 @@
-# Rage Against The State Machine (RATS)
+# Rage against the State Machine (RATS)
 
 ![build](https://github.com/LEB-EPFL/rats/actions/workflows/build.yml/badge.svg)
 
