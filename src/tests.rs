@@ -1,18 +1,18 @@
 #[cfg(test)]
 use rand::prelude::*;
 
-use crate::StateMachine;
+use crate::Stepper;
 
 #[test]
 fn new_state_machine() {
-    let result = StateMachine::new(0, 10);
+    let result = Stepper::new(0, 10);
     assert_eq!(result.current_state, 0);
 }
 
 #[test]
 fn step_state_machine() {
     let mut rng = rand::thread_rng();
-    let mut sm = StateMachine::new(0, 10);
+    let mut sm = Stepper::new(0, 10);
     let old_state = sm.current_state;
 
     let step = sm.step(&mut rng);

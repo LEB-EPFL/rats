@@ -13,15 +13,15 @@ struct Event {
     to: State,
 }
 
-/// A memoryless, probabilistic state machine.
-struct StateMachine {
+/// A memoryless state machine that steps to a new random state at random times.
+struct Stepper {
     current_state: State,
     num_states: State,
 }
 
-impl StateMachine {
+impl Stepper {
     fn new(current_state: State, num_states: State) -> Self {
-        StateMachine {
+        Stepper {
             current_state,
             num_states,
         }
@@ -48,13 +48,13 @@ impl StateMachine {
 }
 
 struct Accumulator {
-    state_machine: StateMachine,
+    state_machine: Stepper,
     t_cutoff: Time,
     event_buffer: Vec<Event>,
 }
 
 impl Accumulator {
-    fn new(state_machine: StateMachine) -> Self {
+    fn new(state_machine: Stepper) -> Self {
         let event_buffer = Vec::new();
 
         Accumulator {
