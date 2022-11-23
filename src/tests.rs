@@ -15,7 +15,8 @@ fn step_state_machine() {
     let mut sm = StateMachine::new(0, 10);
     let old_state = sm.current_state;
 
-    sm.step(&mut rng);
+    let step = sm.step(&mut rng);
 
     assert_ne!(old_state, sm.current_state);
+    assert_ne!(step.from, step.to);
 }
