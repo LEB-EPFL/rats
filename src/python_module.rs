@@ -1,10 +1,11 @@
 use pyo3::prelude::*;
 
-use crate::{Stepper, Accumulator};
+use crate::{Accumulator, State, Stepper};
 
 #[pyclass]
 struct StateMachine {
-    accumulator: Accumulator
+    stepper: Stepper,
+    accumulator: Accumulator,
 }
 
 #[pymethods]
@@ -12,9 +13,17 @@ impl StateMachine {
     #[new]
     fn new() -> Self {
         let stepper = Stepper::new(0, 10);
-        let accumulator = Accumulator::new(stepper);
+        let accumulator = Accumulator::new();
 
-        StateMachine { accumulator }
+        StateMachine {
+            stepper,
+            accumulator,
+        }
+    }
+
+    #[getter]
+    fn current_state(&self) -> PyResult<State> {
+        Ok(self.stepper.current_state)
     }
 }
 

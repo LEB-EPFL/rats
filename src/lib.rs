@@ -48,30 +48,32 @@ impl Stepper {
 }
 
 struct Accumulator {
-    state_machine: Stepper,
     t_cutoff: Time,
     event_buffer: Vec<Event>,
 }
 
 impl Accumulator {
-    fn new(state_machine: Stepper) -> Self {
+    fn new() -> Self {
         let event_buffer = Vec::new();
 
         Accumulator {
-            state_machine,
             t_cutoff: 1.0,
             event_buffer,
         }
     }
 
     /// Steps a state machine until the cumulative sum of event times exceeds a given limit.
-    fn accumulate<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> &mut [Event] {
+    fn accumulate<R: rand::Rng + ?Sized>(
+        &mut self,
+        stepper: &mut Stepper,
+        rng: &mut R,
+    ) -> &mut [Event] {
         self.event_buffer.clear();
 
         let mut t_cumulative: Time = 0.0;
         let mut event: Event;
         loop {
-            event = self.state_machine.step(rng);
+            event = stepper.step(rng);
 
             event.time += t_cumulative;
             if event.time > self.t_cutoff {
