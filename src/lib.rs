@@ -7,7 +7,7 @@ use rand::prelude::*;
 type State = u32;
 type Time = f64;
 
-struct Event {
+struct Transition {
     from: State,
     time: Time,
     to: State,
@@ -27,7 +27,7 @@ impl Stepper {
         }
     }
 
-    fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Event {
+    fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Transition {
         let old_state = self.current_state;
         let mut new_state: State;
         loop {
@@ -39,7 +39,7 @@ impl Stepper {
         self.current_state = new_state;
 
         // TODO Compute the transition time
-        Event {
+        Transition {
             from: old_state,
             time: 0.25,
             to: new_state,
@@ -49,44 +49,44 @@ impl Stepper {
 
 struct Accumulator {
     t_cutoff: Time,
-    event_buffer: Vec<Event>,
+    transition_buffer: Vec<Transition>,
 }
 
 impl Accumulator {
     fn new() -> Self {
-        let event_buffer = Vec::new();
+        let transition_buffer = Vec::new();
 
         Accumulator {
             t_cutoff: 1.0,
-            event_buffer,
+            transition_buffer,
         }
     }
 
-    /// Steps a state machine until the cumulative sum of event times exceeds a given limit.
+    /// Steps a state machine until the cumulative sum of transition times exceeds a given limit.
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
         stepper: &mut Stepper,
         rng: &mut R,
-    ) -> &mut [Event] {
-        self.event_buffer.clear();
+    ) -> &mut [Transition] {
+        self.transition_buffer.clear();
 
         let mut t_cumulative: Time = 0.0;
-        let mut event: Event;
+        let mut transition: Transition;
         loop {
-            event = stepper.step(rng);
+            transition = stepper.step(rng);
 
-            event.time += t_cumulative;
-            if event.time > self.t_cutoff {
-                // The state machine is assumed memoryless, so we don't need to save the event for
+            transition.time += t_cumulative;
+            if transition.time > self.t_cutoff {
+                // The state machine is assumed memoryless, so we don't need to save the transition for
                 // future calls to this function.
                 break;
             } else {
-                t_cumulative = event.time;
-                self.event_buffer.push(event);
+                t_cumulative = transition.time;
+                self.transition_buffer.push(transition);
             }
         }
 
-        self.event_buffer.as_mut_slice()
+        self.transition_buffer.as_mut_slice()
     }
 }
 
