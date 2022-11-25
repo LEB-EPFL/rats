@@ -2,12 +2,12 @@ use pyo3::prelude::*;
 use rand::prelude::*;
 
 use crate::Transition as RustTransition;
-use crate::{Accumulator, State, Stepper, Time};
+use crate::{State, Step, StepUntil, Stepper, Time};
 
 #[pyclass]
 struct StateMachine {
     stepper: Stepper,
-    accumulator: Accumulator,
+    accumulator: StepUntil,
 }
 
 #[pymethods]
@@ -15,7 +15,7 @@ impl StateMachine {
     #[new]
     fn new() -> Self {
         let stepper = Stepper::new(0, 10);
-        let accumulator = Accumulator::new();
+        let accumulator = StepUntil::new();
 
         StateMachine {
             stepper,

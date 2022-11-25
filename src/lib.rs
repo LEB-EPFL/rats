@@ -13,6 +13,10 @@ struct Transition {
     to: State,
 }
 
+trait Step {
+    fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Transition;
+}
+
 /// A memoryless state machine that steps to a new random state at random times.
 struct Stepper {
     current_state: State,
@@ -26,7 +30,9 @@ impl Stepper {
             num_states,
         }
     }
+}
 
+impl Step for Stepper {
     fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Transition {
         let old_state = self.current_state;
         let mut new_state: State;
@@ -47,21 +53,30 @@ impl Stepper {
     }
 }
 
-struct Accumulator {
+trait Accumulate {
+    fn accumulate<R: rand::Rng + ?Sized>(
+        &mut self,
+        stepper: &mut Stepper,
+        rng: &mut R,
+    ) -> &mut [Transition];
+}
+struct StepUntil {
     t_cutoff: Time,
     transition_buffer: Vec<Transition>,
 }
 
-impl Accumulator {
+impl StepUntil {
     fn new() -> Self {
         let transition_buffer = Vec::new();
 
-        Accumulator {
+        StepUntil {
             t_cutoff: 1.0,
             transition_buffer,
         }
     }
+}
 
+impl Accumulate for StepUntil {
     /// Steps a state machine until the cumulative sum of transition times exceeds a given limit.
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
@@ -87,6 +102,20 @@ impl Accumulator {
         }
 
         self.transition_buffer.as_mut_slice()
+    }
+}
+
+struct StateMachine<S: Step, T: Accumulate> {
+    stepper: S,
+    accumulator: T,
+}
+
+impl<S: Step, T: Accumulate> StateMachine<S, T> {
+    fn new(stepper: S, accumulator: T) -> Self {
+        StateMachine {
+            stepper,
+            accumulator,
+        }
     }
 }
 

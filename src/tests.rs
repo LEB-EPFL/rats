@@ -1,7 +1,7 @@
 #[cfg(test)]
 use rand::prelude::*;
 
-use crate::Stepper;
+use crate::{Step, Stepper};
 
 #[test]
 fn new_state_machine() {
