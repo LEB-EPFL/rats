@@ -58,8 +58,9 @@ trait Accumulate {
         &mut self,
         stepper: &mut Stepper,
         rng: &mut R,
-    ) -> &mut [Transition];
+    ) -> &[Transition];
 }
+
 struct StepUntil {
     t_cutoff: Time,
     transition_buffer: Vec<Transition>,
@@ -82,7 +83,7 @@ impl Accumulate for StepUntil {
         &mut self,
         stepper: &mut Stepper,
         rng: &mut R,
-    ) -> &mut [Transition] {
+    ) -> &[Transition] {
         self.transition_buffer.clear();
 
         let mut t_cumulative: Time = 0.0;
@@ -101,7 +102,7 @@ impl Accumulate for StepUntil {
             }
         }
 
-        self.transition_buffer.as_mut_slice()
+        self.transition_buffer.as_slice()
     }
 }
 
