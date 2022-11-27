@@ -3,6 +3,7 @@
 /// A high performance probabilistic state machine simulator
 ///
 use rand::prelude::*;
+use rand_distr::Exp;
 
 type State = u32;
 type Time = f64;
@@ -14,7 +15,7 @@ struct Transition {
 }
 
 trait Step {
-    fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Transition;
+    fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition;
 }
 
 /// A memoryless state machine that steps to a new random state at random times.
@@ -33,7 +34,7 @@ impl Stepper {
 }
 
 impl Step for Stepper {
-    fn step<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Transition {
+    fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition {
         let old_state = self.current_state;
         let mut new_state: State;
         loop {
@@ -44,10 +45,12 @@ impl Step for Stepper {
         }
         self.current_state = new_state;
 
-        // TODO Compute the transition time
+        // TODO Handle Result properly
+        let exp = Exp::new(ctrl_param).unwrap();
+
         Transition {
             from: old_state,
-            time: 0.25,
+            time: exp.sample(rng),
             to: new_state,
         }
     }
@@ -57,6 +60,7 @@ trait Accumulate {
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
         stepper: &mut Stepper,
+        ctrl_param: f64,
         rng: &mut R,
     ) -> &[Transition];
 }
@@ -82,6 +86,7 @@ impl Accumulate for StepUntil {
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
         stepper: &mut Stepper,
+        ctrl_param: f64,
         rng: &mut R,
     ) -> &[Transition] {
         self.transition_buffer.clear();
@@ -89,7 +94,7 @@ impl Accumulate for StepUntil {
         let mut t_cumulative: Time = 0.0;
         let mut transition: Transition;
         loop {
-            transition = stepper.step(rng);
+            transition = stepper.step(ctrl_param, rng);
 
             transition.time += t_cumulative;
             if transition.time > self.t_cutoff {

@@ -13,9 +13,10 @@ fn new_state_machine() {
 fn step_state_machine() {
     let mut rng = rand::thread_rng();
     let mut sm = Stepper::new(0, 10);
+    let ctrl_param = 1.0;
     let old_state = sm.current_state;
 
-    let step = sm.step(&mut rng);
+    let step = sm.step(ctrl_param, &mut rng);
 
     assert_ne!(old_state, sm.current_state);
     assert_ne!(step.from, step.to);

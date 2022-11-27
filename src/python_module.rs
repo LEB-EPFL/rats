@@ -28,9 +28,9 @@ impl StateMachine {
         Ok(self.stepper.current_state)
     }
 
-    fn step(&mut self) -> PyResult<Transition> {
+    fn step(&mut self, ctrl_param: f64) -> PyResult<Transition> {
         let mut rng = rand::thread_rng();
-        let rust_transition = self.stepper.step(&mut rng);
+        let rust_transition = self.stepper.step(ctrl_param, &mut rng);
 
         Ok(Transition::from(rust_transition))
     }
