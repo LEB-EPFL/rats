@@ -15,4 +15,5 @@ crate-type = ["cdylib"]
 [dependencies]
 rand = "*"
 rand_distr = "*"
+rayon = "*"
 pyo3 = { version = "0.17.3", features = ["extension-module"] }

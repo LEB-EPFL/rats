@@ -4,11 +4,12 @@
 ///
 use rand::prelude::*;
 use rand_distr::Exp;
+use rayon::prelude::*;
 
 type State = u32;
 type Time = f64;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Transition {
     from: State,
     time: Time,
@@ -75,6 +76,7 @@ impl StepUntil {
     fn new() -> Self {
         let transition_buffer = Vec::new();
 
+        // TODO Parameterize the cutoff
         StepUntil {
             t_cutoff: 1.0,
             transition_buffer,
@@ -133,6 +135,20 @@ impl<S: Step, A: Accumulate> StateMachine<S, A> {
     fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition {
         self.stepper.step(ctrl_param, rng)
     }
+}
+
+/// Runs a collection of state machines in parallel.
+fn par_run<S: Step + Send, A: Accumulate + Send>(
+    state_machines: &mut [StateMachine<S, A>],
+) -> Vec<Vec<Transition>> {
+    // TODO Inject control parameter
+    state_machines
+        .par_iter_mut()
+        .map_init(
+            || rand::thread_rng(),
+            |rng, sm| sm.accumulate(1.0, rng).to_vec(),
+        )
+        .collect::<Vec<Vec<Transition>>>()
 }
 
 mod python_module;
