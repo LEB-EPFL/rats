@@ -58,9 +58,9 @@ impl Step for Stepper {
 }
 
 trait Accumulate {
-    fn accumulate<R: rand::Rng + ?Sized>(
+    fn accumulate<S: Step, R: rand::Rng + ?Sized>(
         &mut self,
-        stepper: &mut Stepper,
+        stepper: &mut S,
         ctrl_param: f64,
         rng: &mut R,
     ) -> &[Transition];
@@ -84,9 +84,9 @@ impl StepUntil {
 
 impl Accumulate for StepUntil {
     /// Steps a state machine until the cumulative sum of transition times exceeds a given limit.
-    fn accumulate<R: rand::Rng + ?Sized>(
+    fn accumulate<S: Step, R: rand::Rng + ?Sized>(
         &mut self,
-        stepper: &mut Stepper,
+        stepper: &mut S,
         ctrl_param: f64,
         rng: &mut R,
     ) -> &[Transition] {
@@ -112,17 +112,26 @@ impl Accumulate for StepUntil {
     }
 }
 
-struct StateMachine<S: Step, T: Accumulate> {
+struct StateMachine<S: Step, A: Accumulate> {
     stepper: S,
-    accumulator: T,
+    accumulator: A,
 }
 
-impl<S: Step, T: Accumulate> StateMachine<S, T> {
-    fn new(stepper: S, accumulator: T) -> Self {
+impl<S: Step, A: Accumulate> StateMachine<S, A> {
+    fn new(stepper: S, accumulator: A) -> Self {
         StateMachine {
             stepper,
             accumulator,
         }
+    }
+
+    fn accumulate<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> &[Transition] {
+        self.accumulator
+            .accumulate(&mut self.stepper, ctrl_param, rng)
+    }
+
+    fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition {
+        self.stepper.step(ctrl_param, rng)
     }
 }
 
