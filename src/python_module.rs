@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use rand::prelude::*;
 
-use crate::Transition as RustTransition;
+use crate::{Accumulate, Transition as RustTransition};
 use crate::{State, Step, StepUntil, Stepper, Time};
 
 #[pyclass]
@@ -28,6 +28,19 @@ impl StateMachine {
         Ok(self.stepper.current_state)
     }
 
+    fn accumulate(&mut self, ctrl_param: f64) -> PyResult<Vec<Transition>> {
+        let mut rng = rand::thread_rng();
+        let transitions: Vec<Transition> = self
+            .accumulator
+            .accumulate(&mut self.stepper, ctrl_param, &mut rng)
+            .to_vec()
+            .into_iter()
+            .map(|item| Transition::from(item))
+            .collect();
+
+        Ok(transitions)
+    }
+
     fn step(&mut self, ctrl_param: f64) -> PyResult<Transition> {
         let mut rng = rand::thread_rng();
         let rust_transition = self.stepper.step(ctrl_param, &mut rng);
@@ -36,6 +49,7 @@ impl StateMachine {
     }
 }
 
+#[derive(Clone)]
 #[pyclass(frozen)]
 struct Transition {
     #[pyo3(get)]

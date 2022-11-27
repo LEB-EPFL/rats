@@ -8,6 +8,7 @@ use rand_distr::Exp;
 type State = u32;
 type Time = f64;
 
+#[derive(Clone)]
 struct Transition {
     from: State,
     time: Time,
