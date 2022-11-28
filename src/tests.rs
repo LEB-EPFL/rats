@@ -1,7 +1,7 @@
 #[cfg(test)]
 use rand::prelude::*;
 
-use crate::{par_run, StateMachine, Step, StepUntil, Stepper};
+use crate::{par_accumulate, StateMachine, Step, StepUntil, Stepper};
 
 #[test]
 fn stepper_new() {
@@ -30,7 +30,7 @@ fn par_run_state_machines() {
         machines.push(StateMachine::new(Stepper::new(0, 10), StepUntil::new()))
     }
 
-    let results = par_run(machines.as_mut_slice());
+    let results = par_accumulate(machines.as_mut_slice());
 
     assert_eq!(n, results.len())
 }
