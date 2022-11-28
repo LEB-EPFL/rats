@@ -1,7 +1,14 @@
-/// Rage against the State Machine (RATS)
-///
-/// A high performance probabilistic state machine simulator
-///
+//! High performance, probabilistic state machine simulator
+//!
+//! Rage against the State Machine (RATS) provides tools to simulate finite Markov random
+//! processes as finite state machines. You can use RATS to simulate phenomena such as:
+//! - fluorescence
+//! - electronic transitions in atoms and molecules
+//! - queues
+//!
+//! Importantly, RATS allows you to specify transition probabilities that depend on external
+//! control parameters, such as the degree of laser irradiation incident on a flourophore.
+
 use rand::prelude::*;
 use rand_distr::Exp;
 use rayon::prelude::*;
@@ -9,14 +16,36 @@ use rayon::prelude::*;
 type State = u32;
 type Time = f64;
 
+/// A transition of a state machine from one state to another.
+///
+/// Transitions can occur at any point in time, i.e. the time dimension is continuous.
 #[derive(Clone, Debug)]
-struct Transition {
+pub struct Transition {
     from: State,
     time: Time,
     to: State,
 }
 
-trait Step {
+impl Transition {
+    pub fn from(&self) -> State {
+        self.from
+    }
+
+    pub fn time(&self) -> Time {
+        self.time
+    }
+
+    pub fn to(&self) -> State {
+        self.to
+    }
+}
+
+/// State machines that may undergo a transition from one state to another.
+///
+/// `Step` types provide the logic for determining the transition probabilities from a state
+/// machine's current state and actually transition the machine to a new state.
+pub trait Step {
+    /// Steps a state machine to a new state and returns information about the transition.
     fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition;
 }
 
@@ -58,7 +87,8 @@ impl Step for Stepper {
     }
 }
 
-trait Accumulate {
+/// Types that accumulate transitions from a `Step` type until a stop conditioned is reached.
+pub trait Accumulate {
     fn accumulate<S: Step, R: rand::Rng + ?Sized>(
         &mut self,
         stepper: &mut S,
@@ -114,31 +144,36 @@ impl Accumulate for StepUntil {
     }
 }
 
-struct StateMachine<S: Step, A: Accumulate> {
+/// Wraps a pair of `Step` and `Accumulate` types to enable customized state machines.
+pub struct StateMachine<S: Step, A: Accumulate> {
     stepper: S,
     accumulator: A,
 }
 
 impl<S: Step, A: Accumulate> StateMachine<S, A> {
-    fn new(stepper: S, accumulator: A) -> Self {
+    pub fn new(stepper: S, accumulator: A) -> Self {
         StateMachine {
             stepper,
             accumulator,
         }
     }
 
-    fn accumulate<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> &[Transition] {
+    pub fn accumulate<R: rand::Rng + ?Sized>(
+        &mut self,
+        ctrl_param: f64,
+        rng: &mut R,
+    ) -> &[Transition] {
         self.accumulator
             .accumulate(&mut self.stepper, ctrl_param, rng)
     }
 
-    fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition {
+    pub fn step<R: rand::Rng + ?Sized>(&mut self, ctrl_param: f64, rng: &mut R) -> Transition {
         self.stepper.step(ctrl_param, rng)
     }
 }
 
-/// Runs a collection of state machines in parallel.
-fn par_run<S: Step + Send, A: Accumulate + Send>(
+/// Accumulates transitions from a collection of state machines in parallel.
+pub fn par_accumulate<S: Step + Send, A: Accumulate + Send>(
     state_machines: &mut [StateMachine<S, A>],
 ) -> Vec<Vec<Transition>> {
     // TODO Inject control parameter
