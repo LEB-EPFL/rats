@@ -13,7 +13,10 @@ name = "python_lib"
 crate-type = ["cdylib"]
 
 [dependencies]
+ndarray = "*"
+numpy = "*"
+pyo3 = { version = "0.17.3", features = ["extension-module"] }
 rand = "*"
 rand_distr = "*"
 rayon = "*"
-pyo3 = { version = "0.17.3", features = ["extension-module"] }
+thiserror = "*"
