@@ -1,5 +1,5 @@
 #[cfg(test)]
-use ndarray::arr1;
+use ndarray::{arr1, ArrayView1};
 use rand::prelude::*;
 
 use crate::{par_accumulate, StateMachine, Step, StepUntil, Stepper};
@@ -24,14 +24,17 @@ fn stepper_step() {
 }
 
 #[test]
-fn par_run_state_machines() {
+fn par_accumulate_state_machines() {
     let n = 10;
     let mut machines: Vec<StateMachine<Stepper, StepUntil>> = Vec::with_capacity(n);
+    let ctrl_params = arr1(&[1.0]);
+    let mut ctrl_params_per_machine: Vec<ArrayView1<f64>> = Vec::with_capacity(n);
     for _ in 0..n {
-        machines.push(StateMachine::new(Stepper::new(0, 10), StepUntil::new()))
+        machines.push(StateMachine::new(Stepper::new(0, 10), StepUntil::new()));
+        ctrl_params_per_machine.push(ctrl_params.view());
     }
 
-    let results = par_accumulate(machines.as_mut_slice());
+    let results = par_accumulate(machines.as_mut_slice(), ctrl_params_per_machine.as_slice());
 
-    assert_eq!(n, results.len())
+    assert_eq!(n, results.unwrap().len())
 }
