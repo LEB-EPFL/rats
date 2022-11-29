@@ -1,4 +1,5 @@
 #[cfg(test)]
+use ndarray::arr1;
 use rand::prelude::*;
 
 use crate::{par_accumulate, StateMachine, Step, StepUntil, Stepper};
@@ -13,13 +14,13 @@ fn stepper_new() {
 fn stepper_step() {
     let mut rng = rand::thread_rng();
     let mut sm = Stepper::new(0, 10);
-    let ctrl_param = 1.0;
+    let ctrl_params = arr1(&[1.0]);
     let old_state = sm.current_state;
 
-    let step = sm.step(ctrl_param, &mut rng);
+    let transition = sm.step(ctrl_params.view(), &mut rng).unwrap();
 
     assert_ne!(old_state, sm.current_state);
-    assert_ne!(step.from, step.to);
+    assert_ne!(transition.from(), transition.to());
 }
 
 #[test]
