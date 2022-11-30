@@ -10,9 +10,12 @@
 //! control parameters, such as the degree of laser irradiation incident on a flourophore.
 use ::thiserror::Error;
 use ndarray::ArrayView1;
+use pyo3::pyclass;
 use rand::prelude::*;
-use rand_distr::ExpError;
+use rand_distr::{Exp, ExpError};
 use rayon::prelude::*;
+
+use python_module::Transition;
 
 type State = u32;
 type Time = f64;
@@ -28,89 +31,67 @@ pub enum StateMachineError {
     RngError(#[from] ExpError),
 }
 
-/// A transition of a state machine from one state to another.
+#[pyclass]
+#[derive(Clone)]
+/// Memoryless state machines that may undergo a transition from one state to another.
 ///
-/// Transitions can occur at any point in time, i.e. the time dimension is continuous.
-#[derive(Clone, Debug)]
-pub struct Transition {
-    from: State,
-    time: Time,
-    to: State,
-}
-
-impl Transition {
-    /// Returns the state from which the state machine transitioned
-    pub fn from(&self) -> State {
-        self.from
-    }
-
-    /// Returns the time at which the state machine transitioned
-    pub fn time(&self) -> Time {
-        self.time
-    }
-
-    /// Returns the state to which the state machine transitioned
-    pub fn to(&self) -> State {
-        self.to
-    }
-}
-
-/// State machines that may undergo a transition from one state to another.
-///
-/// `Step` types provide the logic for determining the transition probabilities from a state
+/// These types provide the logic for determining the transition probabilities from a state
 /// machine's current state and actually transition the machine to a new state.
-///
-/// # Arguments
-///
-/// - **ctrl_params** A 1D array view of zero or more control parameters that determine the
-///   transition probabilities from the machine's current state to all the possible subsequent
-///   states
-/// - **rng** A random number generator
-pub trait Step {
-    /// Returns the current state of the state machine.
-    fn current_state(&self) -> State;
+pub struct Stepper {
+    current_state: State,
+    num_states: State,
+}
 
-    /// Steps a state machine to a new state and returns information about the transition.
+impl Stepper {
+    pub fn new(current_state: State, num_states: State) -> Self {
+        Stepper {
+            current_state,
+            num_states,
+        }
+    }
+
+    /// Returns the stepper's current state.
+    fn current_state(&self) -> State {
+        self.current_state
+    }
+
+    /// Returns the stepper's number of states.
+    pub fn num_states(&self) -> State {
+        self.num_states
+    }
+
+    /// 
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: ArrayView1<f64>,
+        ctrl_params: ArrayView1<Time>,
         rng: &mut R,
-    ) -> Result<Transition>;
+    ) -> Result<Transition> {
+        if ctrl_params.len() != 1 {
+            return Err(StateMachineError::NumElems {
+                actual: ctrl_params.len(),
+                expected: 1,
+            });
+        }
+
+        let old_state = self.current_state;
+        let mut new_state: State;
+        loop {
+            new_state = rng.gen_range(0..self.num_states - 1);
+            if new_state != self.current_state {
+                break;
+            }
+        }
+        self.current_state = new_state;
+
+        let exp = Exp::new(ctrl_params[0])?;
+
+        Ok(Transition {
+            from_state: old_state,
+            time: exp.sample(rng),
+            to_state: new_state,
+        })
+    }
 }
-
-/// Types that accumulate transitions from a `Step` type until a stop conditioned is reached.
-pub trait Accumulate {
-    fn accumulate<R: rand::Rng + ?Sized>(
-        &mut self,
-        ctrl_params: ArrayView1<f64>,
-        rng: &mut R,
-    ) -> Result<&[Transition]>;
-}
-
-/// Accumulates transitions from a collection of state machines in parallel.
-pub fn par_accumulate<A: Accumulate + Send>(
-    accumulators: &mut [A],
-    ctrl_params: &[ArrayView1<f64>],
-) -> Result<Vec<Vec<Transition>>> {
-    if accumulators.len() != ctrl_params.len() {
-        return Err(StateMachineError::NumElems {
-            actual: ctrl_params.len(),
-            expected: accumulators.len(),
-        });
-    };
-
-    // This creates an object of type MultiZip from the Rayon crate
-    (accumulators, ctrl_params)
-        .into_par_iter()
-        .map_init(
-            || rand::thread_rng(),
-            |rng, item| Ok(item.0.accumulate(*item.1, rng)?.to_vec()),
-        )
-        .collect::<Result<Vec<Vec<Transition>>>>()
-}
-
-pub mod accumulators;
-pub mod steppers;
 
 mod python_module;
 
@@ -118,23 +99,31 @@ mod tests {
     #[cfg(test)]
     use ndarray::{arr1, ArrayView1};
 
-    use super::par_accumulate;
-    use crate::accumulators::StepUntil;
-    use crate::steppers::Stepper;
+    use crate::Stepper;
 
     #[test]
-    fn par_accumulate_state_machines() {
-        let n = 10;
-        let mut accumulators: Vec<StepUntil<Stepper>> = Vec::with_capacity(n);
+    fn stepper_new() {
+        let current_state = 0;
+        let num_states = 10;
+
+        let result = Stepper::new(current_state, num_states);
+
+        let states = 0..num_states;
+        assert!(states.contains(&result.current_state()));
+        assert_eq!(current_state, result.current_state());
+        assert_eq!(num_states, result.num_states());
+    }
+
+    #[test]
+    fn stepper_step() {
+        let mut rng = rand::thread_rng();
+        let mut sm = Stepper::new(0, 10);
         let ctrl_params = arr1(&[1.0]);
-        let mut ctrl_params_per_machine: Vec<ArrayView1<f64>> = Vec::with_capacity(n);
-        for _ in 0..n {
-            accumulators.push(StepUntil::new(Stepper::new(0, 10), 1.0));
-            ctrl_params_per_machine.push(ctrl_params.view());
-        }
+        let old_state = sm.current_state();
 
-        let results = par_accumulate(accumulators.as_mut_slice(), ctrl_params_per_machine.as_slice());
+        let transition = sm.step(ctrl_params.view(), &mut rng).unwrap();
 
-        assert_eq!(n, results.unwrap().len())
+        assert_ne!(old_state, sm.current_state());
+        assert_ne!(transition.from_state(), transition.to_state());
     }
 }
