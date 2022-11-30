@@ -11,7 +11,7 @@
 use ::thiserror::Error;
 use ndarray::ArrayView1;
 use rand::prelude::*;
-use rand_distr::{Exp, ExpError};
+use rand_distr::ExpError;
 use rayon::prelude::*;
 
 type State = u32;
@@ -62,7 +62,7 @@ impl Transition {
 ///
 /// # Arguments
 ///
-/// - **ctrl_param** A 1D array view of zero or more control parameters that determine the
+/// - **ctrl_params** A 1D array view of zero or more control parameters that determine the
 ///   transition probabilities from the machine's current state to all the possible subsequent
 ///   states
 /// - **rng** A random number generator
@@ -75,54 +75,6 @@ pub trait Step {
     ) -> Result<Transition>;
 }
 
-/// A memoryless state machine that steps to a new random state at random times.
-struct Stepper {
-    current_state: State,
-    num_states: State,
-}
-
-impl Stepper {
-    fn new(current_state: State, num_states: State) -> Self {
-        Stepper {
-            current_state,
-            num_states,
-        }
-    }
-}
-
-impl Step for Stepper {
-    fn step<R: rand::Rng + ?Sized>(
-        &mut self,
-        ctrl_params: ArrayView1<f64>,
-        rng: &mut R,
-    ) -> Result<Transition> {
-        if ctrl_params.len() != 1 {
-            return Err(StateMachineError::NumElems {
-                actual: ctrl_params.len(),
-                expected: 1,
-            });
-        }
-
-        let old_state = self.current_state;
-        let mut new_state: State;
-        loop {
-            new_state = rng.gen_range(0..self.num_states - 1);
-            if new_state != self.current_state {
-                break;
-            }
-        }
-        self.current_state = new_state;
-
-        let exp = Exp::new(ctrl_params[0])?;
-
-        Ok(Transition {
-            from: old_state,
-            time: exp.sample(rng),
-            to: new_state,
-        })
-    }
-}
-
 /// Types that accumulate transitions from a `Step` type until a stop conditioned is reached.
 pub trait Accumulate {
     fn accumulate<S: Step, R: rand::Rng + ?Sized>(
@@ -131,53 +83,6 @@ pub trait Accumulate {
         ctrl_params: ArrayView1<f64>,
         rng: &mut R,
     ) -> Result<&[Transition]>;
-}
-
-struct StepUntil {
-    t_cutoff: Time,
-    transition_buffer: Vec<Transition>,
-}
-
-impl StepUntil {
-    fn new() -> Self {
-        let transition_buffer = Vec::new();
-
-        // TODO Parameterize the cutoff
-        StepUntil {
-            t_cutoff: 1.0,
-            transition_buffer,
-        }
-    }
-}
-
-impl Accumulate for StepUntil {
-    /// Steps a state machine until the cumulative sum of transition times exceeds a given limit.
-    fn accumulate<S: Step, R: rand::Rng + ?Sized>(
-        &mut self,
-        stepper: &mut S,
-        ctrl_params: ArrayView1<f64>,
-        rng: &mut R,
-    ) -> Result<&[Transition]> {
-        self.transition_buffer.clear();
-
-        let mut t_cumulative: Time = 0.0;
-        let mut transition: Transition;
-        loop {
-            transition = stepper.step(ctrl_params, rng)?;
-
-            transition.time += t_cumulative;
-            if transition.time > self.t_cutoff {
-                // The state machine is assumed memoryless, so we don't need to save the transition for
-                // future calls to this function.
-                break;
-            } else {
-                t_cumulative = transition.time;
-                self.transition_buffer.push(transition);
-            }
-        }
-
-        Ok(self.transition_buffer.as_slice())
-    }
 }
 
 /// Wraps a pair of `Step` and `Accumulate` types to enable customized state machines.
@@ -234,5 +139,32 @@ pub fn par_accumulate<S: Step + Send, A: Accumulate + Send>(
         .collect::<Result<Vec<Vec<Transition>>>>()
 }
 
+pub mod accumulators;
+pub mod steppers;
+
 mod python_module;
-mod tests;
+
+mod tests {
+    #[cfg(test)]
+    use ndarray::{arr1, ArrayView1};
+
+    use super::{par_accumulate, StateMachine};
+    use crate::accumulators::StepUntil;
+    use crate::steppers::Stepper;
+
+    #[test]
+    fn par_accumulate_state_machines() {
+        let n = 10;
+        let mut machines: Vec<StateMachine<Stepper, StepUntil>> = Vec::with_capacity(n);
+        let ctrl_params = arr1(&[1.0]);
+        let mut ctrl_params_per_machine: Vec<ArrayView1<f64>> = Vec::with_capacity(n);
+        for _ in 0..n {
+            machines.push(StateMachine::new(Stepper::new(0, 10), StepUntil::new()));
+            ctrl_params_per_machine.push(ctrl_params.view());
+        }
+
+        let results = par_accumulate(machines.as_mut_slice(), ctrl_params_per_machine.as_slice());
+
+        assert_eq!(n, results.unwrap().len())
+    }
+}

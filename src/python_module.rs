@@ -3,8 +3,10 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::prelude::*;
 
+use crate::accumulators::StepUntil;
+use crate::steppers::Stepper;
 use crate::{Accumulate, StateMachineError, Transition as RustTransition};
-use crate::{State, Step, StepUntil, Stepper, Time};
+use crate::{State, Step, Time};
 
 #[pyclass]
 struct StateMachine {
@@ -27,7 +29,7 @@ impl StateMachine {
 
     #[getter]
     fn current_state(&self) -> PyResult<State> {
-        Ok(self.stepper.current_state)
+        Ok(self.stepper.current_state())
     }
 
     fn accumulate(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> Result<Vec<Transition>, PyErr> {
