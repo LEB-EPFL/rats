@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-class StateMachine(Protocol):
+class Accumulator(Protocol):
     current_state: int
 
 @dataclass(frozen=True)

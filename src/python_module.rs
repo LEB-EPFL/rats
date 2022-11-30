@@ -1,6 +1,8 @@
+use ndarray::ArrayView1;
 use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use rand::prelude::*;
 
 use crate::accumulators::StepUntil;
@@ -9,34 +11,30 @@ use crate::{Accumulate, StateMachineError, Transition as RustTransition};
 use crate::{State, Step, Time};
 
 #[pyclass]
-struct StateMachine {
-    stepper: Stepper,
-    accumulator: StepUntil,
+struct Accumulator {
+    accumulator: StepUntil<Stepper>,
 }
 
 #[pymethods]
-impl StateMachine {
+impl Accumulator {
     #[new]
     fn new() -> Self {
         let stepper = Stepper::new(0, 10);
-        let accumulator = StepUntil::new();
+        let accumulator = StepUntil::new(stepper, 1.0);
 
-        StateMachine {
-            stepper,
-            accumulator,
-        }
+        Accumulator { accumulator }
     }
 
     #[getter]
     fn current_state(&self) -> PyResult<State> {
-        Ok(self.stepper.current_state())
+        Ok(self.accumulator.stepper().current_state())
     }
 
     fn accumulate(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> Result<Vec<Transition>, PyErr> {
         let mut rng = rand::thread_rng();
         let transitions: Vec<Transition> = self
             .accumulator
-            .accumulate(&mut self.stepper, ctrl_params.as_array(), &mut rng)?
+            .accumulate(ctrl_params.as_array(), &mut rng)?
             .to_vec()
             .into_iter()
             .map(|item| Transition::from(item))
@@ -47,7 +45,7 @@ impl StateMachine {
 
     fn step(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> Result<Transition, PyErr> {
         let mut rng = rand::thread_rng();
-        let rust_transition = self.stepper.step(ctrl_params.as_array(), &mut rng)?;
+        let rust_transition = self.accumulator.stepper().step(ctrl_params.as_array(), &mut rng)?;
 
         Ok(Transition::from(rust_transition))
     }
@@ -92,7 +90,7 @@ impl From<StateMachineError> for PyErr {
 /// will not be able to import the module.
 #[pymodule]
 fn python_lib(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_class::<StateMachine>()?;
+    m.add_class::<Accumulator>()?;
     m.add_class::<Transition>()?;
     Ok(())
 }
