@@ -19,7 +19,9 @@ authors = [
 classifiers = [
   "Programming Language :: Python"
 ]
-dependencies = [ ]
+dependencies = [
+  "numpy"
+]
 
 [project.optional-dependencies]
 develop = [
