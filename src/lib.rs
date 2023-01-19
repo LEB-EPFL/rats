@@ -62,9 +62,8 @@ impl Transition {
 ///
 /// # Arguments
 ///
-/// - **ctrl_params** A 1D array view of zero or more control parameters that determine the
-///   transition probabilities from the machine's current state to all the possible subsequent
-///   states
+/// - **ctrl_params** A 1D slice of zero or more control parameters that determine the transition
+///   probabilities from the machine's current state to all the possible subsequent states
 /// - **rng** A random number generator
 pub trait Step {
     /// Returns the current state of the state machine.
@@ -73,7 +72,7 @@ pub trait Step {
     /// Steps a state machine to a new state and returns information about the transition.
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: ArrayView1<f64>,
+        ctrl_params: &[f64],
         rng: &mut R,
     ) -> Result<Transition>;
 }
@@ -82,7 +81,7 @@ pub trait Step {
 pub trait Accumulate {
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: ArrayView1<f64>,
+        ctrl_params: &[f64],
         rng: &mut R,
     ) -> Result<&[Transition]>;
 }
@@ -90,7 +89,7 @@ pub trait Accumulate {
 /// Accumulates transitions from a collection of state machines in parallel.
 pub fn par_accumulate<A: Accumulate + Send>(
     accumulators: &mut [A],
-    ctrl_params: &[ArrayView1<f64>],
+    ctrl_params: &[&[f64]],
 ) -> Result<Vec<Vec<Transition>>> {
     if accumulators.len() != ctrl_params.len() {
         return Err(StateMachineError::NumElems {
@@ -116,8 +115,6 @@ mod python_module;
 
 mod tests {
     #[cfg(test)]
-    use ndarray::{arr1, ArrayView1};
-
     use super::par_accumulate;
     use crate::accumulators::StepUntil;
     use crate::steppers::Stepper;
@@ -126,11 +123,11 @@ mod tests {
     fn par_accumulate_state_machines() {
         let n = 10;
         let mut accumulators: Vec<StepUntil<Stepper>> = Vec::with_capacity(n);
-        let ctrl_params = arr1(&[1.0]);
-        let mut ctrl_params_per_machine: Vec<ArrayView1<f64>> = Vec::with_capacity(n);
+        let ctrl_params = vec![1.0];
+        let mut ctrl_params_per_machine: Vec<&[f64]> = Vec::with_capacity(n);
         for _ in 0..n {
             accumulators.push(StepUntil::new(Stepper::new(0, 10), 1.0));
-            ctrl_params_per_machine.push(ctrl_params.view());
+            ctrl_params_per_machine.push(ctrl_params.as_slice());
         }
 
         let results = par_accumulate(

@@ -33,7 +33,7 @@ impl Step for Stepper {
 
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: ArrayView1<Time>,
+        ctrl_params: &[Time],
         rng: &mut R,
     ) -> Result<Transition> {
         // Temporary constraint
@@ -66,7 +66,6 @@ impl Step for Stepper {
 
 mod tests {
     #[cfg(test)]
-    use ndarray::arr1;
     use rand::thread_rng;
 
     use super::Stepper;
@@ -89,10 +88,10 @@ mod tests {
     fn stepper_step() {
         let mut rng = rand::thread_rng();
         let mut sm = Stepper::new(0, 10);
-        let ctrl_params = arr1(&[1.0]);
+        let ctrl_params = vec![1.0];
         let old_state = sm.current_state();
 
-        let transition = sm.step(ctrl_params.view(), &mut rng).unwrap();
+        let transition = sm.step(ctrl_params.as_slice(), &mut rng).unwrap();
 
         assert_ne!(old_state, sm.current_state());
         assert_ne!(transition.from(), transition.to());

@@ -33,7 +33,7 @@ impl<S: Step> Accumulate for StepUntil<S> {
     /// Steps a state machine until the cumulative sum of transition times exceeds a given limit.
     fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: ArrayView1<f64>,
+        ctrl_params: &[f64],
         rng: &mut R,
     ) -> Result<&[Transition]> {
         self.transition_buffer.clear();

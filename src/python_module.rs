@@ -1,7 +1,7 @@
 use std::ops::DerefMut;
 
 use ndarray::ArrayView1;
-use numpy::{PyArray1, PyReadonlyArray1};
+use numpy::PyReadonlyArray1;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::prelude::*;
@@ -36,7 +36,7 @@ impl PyStateMachine {
         &mut self,
         ctrl_params: PyReadonlyArray1<f64>,
     ) -> Result<Vec<PyTransition>, PyErr> {
-        let ctrl_params = ctrl_params.as_array();
+        let ctrl_params = ctrl_params.as_slice()?;
         self.base_accumulate(ctrl_params)
     }
 
@@ -45,7 +45,7 @@ impl PyStateMachine {
         let transition = self
             .accumulator
             .stepper_mut()
-            .step(ctrl_params.as_array(), &mut rng)?;
+            .step(ctrl_params.as_slice()?, &mut rng)?;
 
         Ok(PyTransition::from(transition))
     }
@@ -59,13 +59,7 @@ impl PyStateMachine {
     /// # Arguments
     /// - ctrl_params: The control parameters that determine the state machine's transition rates.
     ///
-    fn base_accumulate(
-        &mut self,
-        ctrl_params: ArrayView1<f64>,
-    ) -> Result<Vec<PyTransition>, PyErr> {
-        // Accepts a ctrl_params argument that is thread safe; PyReadonlyArray1 is not thread safe.
-
-        // TODO Accept a vector of ctrl_params, one for each state machine!
+    fn base_accumulate(&mut self, ctrl_params: &[f64]) -> Result<Vec<PyTransition>, PyErr> {
         let mut rng = rand::thread_rng();
         let transitions: Vec<PyTransition> = self
             .accumulator
@@ -105,9 +99,15 @@ impl From<Transition> for PyTransition {
 #[pyfunction]
 pub fn par_accumulate(
     machines: Vec<&PyCell<PyStateMachine>>,
-    ctrl_params: PyReadonlyArray1<f64>,
+    ctrl_params: Vec<PyReadonlyArray1<f64>>,
 ) -> PyResult<Vec<Vec<PyTransition>>> {
-    let ctrl_params = ctrl_params.as_array();
+    let ctrl_params: Vec<&[f64]> = ctrl_params
+        .iter()
+        .map(|item| item.as_slice())
+        .collect::<Result<Vec<&[f64]>, _>>()?;
+
+    // I wanted to avoid copying the StateMachine objects that are owned by the Python
+    // interpreter and instead mutate them directly; this is the only way I managed to do it.
     let mut machines = machines
         .into_iter()
         .map(|cell| cell.try_borrow_mut())
@@ -118,9 +118,9 @@ pub fn par_accumulate(
         .map(|refr| refr.deref_mut())
         .collect::<Vec<&mut PyStateMachine>>();
 
-    Ok(machines
+    Ok((machines.as_mut_slice(), ctrl_params.as_slice())
         .into_par_iter()
-        .map(|machine| machine.base_accumulate(ctrl_params))
+        .map(|item| item.0.base_accumulate(*item.1))
         .collect::<Result<Vec<Vec<PyTransition>>, _>>()?)
 }
 

@@ -15,5 +15,5 @@ class Transition(Protocol):
     to_state: int
 
 def par_accumulate(
-    machines: list[StateMachine], ctrl_params: npt.NDArray[np.float64]
+    machines: list[StateMachine], ctrl_params: list[npt.NDArray[np.float64]]
 ) -> list[list[Transition]]: ...

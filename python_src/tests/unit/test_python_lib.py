@@ -20,7 +20,7 @@ def test_state_machine_step():
 def test_par_accumulate():
     num_machines = 10
     machines = [StateMachine() for _ in range(num_machines)]
-    ctrl_params = np.array([1.0])
+    ctrl_params = [np.array([1.0]) for _ in range(num_machines)]
 
     transitions = par_accumulate(machines, ctrl_params)
 
