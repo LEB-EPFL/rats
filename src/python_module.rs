@@ -1,7 +1,7 @@
 use std::ops::DerefMut;
 
 use ndarray::ArrayView1;
-use numpy::PyReadonlyArray1;
+use numpy::{PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::prelude::*;
@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use crate::accumulators::StepUntil;
 use crate::steppers::Stepper;
 use crate::{Accumulate, StateMachineError, Transition};
-use crate::{State, Step, Time};
+use crate::{Rate, State, Step, Time};
 
 #[pyclass(name = "StateMachine")]
 pub struct PyStateMachine {
@@ -20,11 +20,27 @@ pub struct PyStateMachine {
 #[pymethods]
 impl PyStateMachine {
     #[new]
-    fn new() -> Self {
-        let stepper = Stepper::new(0, 10);
+    fn new(starting_state: State, rate_constants: PyReadonlyArray2<Rate>) -> PyResult<Self> {
+        if rate_constants.shape()[0] != rate_constants.shape()[1] {
+            return Err(PyValueError::new_err(
+                "rate_constants must be a N x N array where N is the number of states",
+            ));
+        };
+
+        if starting_state > rate_constants.shape()[0] {
+            return Err(PyValueError::new_err("starting_state must be between 0 and the N - 1, where N x N is the shape of rate_constants"));
+        };
+
+        let rate_constants = rate_constants.as_array().to_owned();
+        let mut new: Vec<Vec<Rate>> = Vec::new();
+        for row in rate_constants.rows() {
+            new.push(row.to_vec());
+        }
+
+        let stepper = Stepper::new(0, new);
         let accumulator = StepUntil::new(stepper, 1.0);
 
-        PyStateMachine { accumulator }
+        Ok(PyStateMachine { accumulator })
     }
 
     #[getter]
@@ -32,15 +48,12 @@ impl PyStateMachine {
         Ok(self.accumulator.stepper().current_state())
     }
 
-    fn accumulate(
-        &mut self,
-        ctrl_params: PyReadonlyArray1<f64>,
-    ) -> Result<Vec<PyTransition>, PyErr> {
+    fn accumulate(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> PyResult<Vec<PyTransition>> {
         let ctrl_params = ctrl_params.as_slice()?;
         self.base_accumulate(ctrl_params)
     }
 
-    fn step(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> Result<PyTransition, PyErr> {
+    fn step(&mut self, ctrl_params: PyReadonlyArray1<f64>) -> PyResult<PyTransition> {
         let mut rng = rand::thread_rng();
         let transition = self
             .accumulator
@@ -132,6 +145,7 @@ impl From<StateMachineError> for PyErr {
                 expected: _,
             } => PyValueError::new_err(err.to_string()),
             StateMachineError::RngError(_) => PyValueError::new_err(err.to_string()),
+            StateMachineError::Stopped => PyValueError::new_err(err.to_string()),
         }
     }
 }
