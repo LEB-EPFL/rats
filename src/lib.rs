@@ -67,6 +67,9 @@ impl Transition {
 ///   states
 /// - **rng** A random number generator
 pub trait Step {
+    /// Returns the current state of the state machine.
+    fn current_state(&self) -> State;
+
     /// Steps a state machine to a new state and returns information about the transition.
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
@@ -77,60 +80,27 @@ pub trait Step {
 
 /// Types that accumulate transitions from a `Step` type until a stop conditioned is reached.
 pub trait Accumulate {
-    fn accumulate<S: Step, R: rand::Rng + ?Sized>(
+    fn accumulate<R: rand::Rng + ?Sized>(
         &mut self,
-        stepper: &mut S,
         ctrl_params: ArrayView1<f64>,
         rng: &mut R,
     ) -> Result<&[Transition]>;
 }
 
-/// Wraps a pair of `Step` and `Accumulate` types to enable customized state machines.
-pub struct StateMachine<S: Step, A: Accumulate> {
-    stepper: S,
-    accumulator: A,
-}
-
-impl<S: Step, A: Accumulate> StateMachine<S, A> {
-    pub fn new(stepper: S, accumulator: A) -> Self {
-        StateMachine {
-            stepper,
-            accumulator,
-        }
-    }
-
-    pub fn accumulate<R: rand::Rng + ?Sized>(
-        &mut self,
-        ctrl_params: ArrayView1<f64>,
-        rng: &mut R,
-    ) -> Result<&[Transition]> {
-        self.accumulator
-            .accumulate(&mut self.stepper, ctrl_params, rng)
-    }
-
-    pub fn step<R: rand::Rng + ?Sized>(
-        &mut self,
-        ctrl_params: ArrayView1<f64>,
-        rng: &mut R,
-    ) -> Result<Transition> {
-        self.stepper.step(ctrl_params, rng)
-    }
-}
-
 /// Accumulates transitions from a collection of state machines in parallel.
-pub fn par_accumulate<S: Step + Send, A: Accumulate + Send>(
-    state_machines: &mut [StateMachine<S, A>],
+pub fn par_accumulate<A: Accumulate + Send>(
+    accumulators: &mut [A],
     ctrl_params: &[ArrayView1<f64>],
 ) -> Result<Vec<Vec<Transition>>> {
-    if state_machines.len() != ctrl_params.len() {
+    if accumulators.len() != ctrl_params.len() {
         return Err(StateMachineError::NumElems {
             actual: ctrl_params.len(),
-            expected: state_machines.len(),
+            expected: accumulators.len(),
         });
     };
 
     // This creates an object of type MultiZip from the Rayon crate
-    (state_machines, ctrl_params)
+    (accumulators, ctrl_params)
         .into_par_iter()
         .map_init(
             || rand::thread_rng(),
@@ -148,22 +118,25 @@ mod tests {
     #[cfg(test)]
     use ndarray::{arr1, ArrayView1};
 
-    use super::{par_accumulate, StateMachine};
+    use super::par_accumulate;
     use crate::accumulators::StepUntil;
     use crate::steppers::Stepper;
 
     #[test]
     fn par_accumulate_state_machines() {
         let n = 10;
-        let mut machines: Vec<StateMachine<Stepper, StepUntil>> = Vec::with_capacity(n);
+        let mut accumulators: Vec<StepUntil<Stepper>> = Vec::with_capacity(n);
         let ctrl_params = arr1(&[1.0]);
         let mut ctrl_params_per_machine: Vec<ArrayView1<f64>> = Vec::with_capacity(n);
         for _ in 0..n {
-            machines.push(StateMachine::new(Stepper::new(0, 10), StepUntil::new()));
+            accumulators.push(StepUntil::new(Stepper::new(0, 10), 1.0));
             ctrl_params_per_machine.push(ctrl_params.view());
         }
 
-        let results = par_accumulate(machines.as_mut_slice(), ctrl_params_per_machine.as_slice());
+        let results = par_accumulate(
+            accumulators.as_mut_slice(),
+            ctrl_params_per_machine.as_slice(),
+        );
 
         assert_eq!(n, results.unwrap().len())
     }

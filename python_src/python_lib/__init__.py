@@ -2,4 +2,4 @@
 
 """
 
-from .python_lib import StateMachine
+from .python_lib import StateMachine, par_accumulate

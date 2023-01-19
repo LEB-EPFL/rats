@@ -1,4 +1,4 @@
-//! Provides concrete implementations of the Step trait.
+//! Provides concrete implementations of StateMachines that implement the Step trait.
 use ndarray::ArrayView1;
 use rand::prelude::*;
 use rand_distr::Exp;
@@ -19,11 +19,6 @@ impl Stepper {
         }
     }
 
-    /// Returns the stepper's current state.
-    pub fn current_state(&self) -> State {
-        self.current_state
-    }
-
     /// Returns the stepper's number of states.
     pub fn num_states(&self) -> State {
         self.num_states
@@ -31,11 +26,17 @@ impl Stepper {
 }
 
 impl Step for Stepper {
+    /// Returns the stepper's current state.
+    fn current_state(&self) -> State {
+        self.current_state
+    }
+
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
         ctrl_params: ArrayView1<Time>,
         rng: &mut R,
     ) -> Result<Transition> {
+        // Temporary constraint
         if ctrl_params.len() != 1 {
             return Err(StateMachineError::NumElems {
                 actual: ctrl_params.len(),
