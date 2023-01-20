@@ -8,6 +8,12 @@ import numpy.typing as npt
 class StateMachine(Protocol):
     current_state: int
 
+    def __new__(
+        cls: "StateMachine",
+        starting_state: int,
+        rate_constants: npt.NDArray[np.float64],
+    ) -> "StateMachine": ...
+
 @dataclass(frozen=True)
 class Transition(Protocol):
     from_state: int

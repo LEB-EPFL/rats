@@ -14,7 +14,9 @@ use rand::prelude::*;
 use rand_distr::ExpError;
 use rayon::prelude::*;
 
-type State = u32;
+type CtrlParam = f64;
+type Rate = f64;
+type State = usize;
 type Time = f64;
 
 type Result<T> = std::result::Result<T, StateMachineError>;
@@ -26,6 +28,8 @@ pub enum StateMachineError {
     NumElems { actual: usize, expected: usize },
     #[error(transparent)]
     RngError(#[from] ExpError),
+    #[error("The StateMachine has stopped")]
+    Stopped,
 }
 
 /// A transition of a state machine from one state to another.
@@ -72,7 +76,7 @@ pub trait Step {
     /// Steps a state machine to a new state and returns information about the transition.
     fn step<R: rand::Rng + ?Sized>(
         &mut self,
-        ctrl_params: &[f64],
+        ctrl_params: &[CtrlParam],
         rng: &mut R,
     ) -> Result<Transition>;
 }
@@ -118,15 +122,17 @@ mod tests {
     use super::par_accumulate;
     use crate::accumulators::StepUntil;
     use crate::steppers::Stepper;
+    use crate::Rate;
 
     #[test]
     fn par_accumulate_state_machines() {
         let n = 10;
+        let rate_constants: Vec<Vec<Rate>> = vec![vec![-1.0, 1.0], vec![1.0, -1.0]];
         let mut accumulators: Vec<StepUntil<Stepper>> = Vec::with_capacity(n);
         let ctrl_params = vec![1.0];
         let mut ctrl_params_per_machine: Vec<&[f64]> = Vec::with_capacity(n);
         for _ in 0..n {
-            accumulators.push(StepUntil::new(Stepper::new(0, 10), 1.0));
+            accumulators.push(StepUntil::new(Stepper::new(0, rate_constants.clone()), 1.0));
             ctrl_params_per_machine.push(ctrl_params.as_slice());
         }
 
