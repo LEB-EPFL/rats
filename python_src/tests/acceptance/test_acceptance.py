@@ -2,7 +2,7 @@ import numpy as np
 from python_lib import StateMachine
 
 NUM_TRANSITIONS = 10000  # Number of steps to perform
-TOL_NUM_SIGMAS = 4  # A single assertion will fail ~ 1 / 16,000 times
+TOL_NUM_SIGMAS = 4  # A single assertion will fail ~ 1 / 16,000 times for normal data
 
 
 def test_mean_transition_times():
