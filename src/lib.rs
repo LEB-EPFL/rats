@@ -113,6 +113,7 @@ pub fn par_accumulate<A: Accumulate + Send>(
 }
 
 pub mod accumulators;
+mod arrays;
 pub mod steppers;
 
 mod python_module;
@@ -121,13 +122,17 @@ mod tests {
     #[cfg(test)]
     use super::par_accumulate;
     use crate::accumulators::StepUntil;
+    use crate::arrays::Array2D;
     use crate::steppers::Stepper;
     use crate::Rate;
 
     #[test]
     fn par_accumulate_state_machines() {
         let n = 10;
-        let rate_constants: Vec<Vec<Rate>> = vec![vec![-1.0, 1.0], vec![1.0, -1.0]];
+        let rate_constants = Array2D {
+            data: vec![-1.0, 1.0, 1.0, -1.0],
+            shape: (2, 2),
+        };
         let mut accumulators: Vec<StepUntil<Stepper>> = Vec::with_capacity(n);
         let ctrl_params = vec![1.0];
         let mut ctrl_params_per_machine: Vec<&[f64]> = Vec::with_capacity(n);
