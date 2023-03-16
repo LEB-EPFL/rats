@@ -9,6 +9,20 @@ def test_state_machine():
     assert isinstance(sm.current_state, int)
 
 
+def test_state_machine_with_rate_coefficients():
+    rate_constants = np.array([[-1.0, 1.0], [1.0, -1.0]])
+    rate_coefficients = np.array(
+        [
+            [[[-1, 1], [1, -1]], [[-1, 1], [1, -1]]],
+            [[[-1, 1], [1, -1]], [[-1, 1], [1, -1]]],
+        ],
+        dtype=np.float64,
+    )
+    sm = StateMachine(0, rate_constants, rate_coefficients)
+
+    assert isinstance(sm.current_state, int)
+
+
 def test_state_machine_step():
     rate_constants = np.array([[-1.0, 1.0], [1.0, -1.0]])
     starting_state = 0

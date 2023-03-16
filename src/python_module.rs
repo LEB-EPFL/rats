@@ -1,13 +1,13 @@
 use std::ops::DerefMut;
 
-use ndarray::ArrayView1;
-use numpy::{PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArray4};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rand::prelude::*;
 use rayon::prelude::*;
 
 use crate::accumulators::StepUntil;
+use crate::arrays::Array2D;
 use crate::steppers::Stepper;
 use crate::{Accumulate, StateMachineError, Transition};
 use crate::{Rate, State, Step, Time};
@@ -20,24 +20,40 @@ pub struct PyStateMachine {
 #[pymethods]
 impl PyStateMachine {
     #[new]
-    fn new(starting_state: State, rate_constants: PyReadonlyArray2<Rate>) -> PyResult<Self> {
+    fn new(
+        starting_state: State,
+        rate_constants: PyReadonlyArray2<Rate>,
+        rate_coefficients: Option<PyReadonlyArray4<Rate>>,
+    ) -> PyResult<Self> {
         if rate_constants.shape()[0] != rate_constants.shape()[1] {
             return Err(PyValueError::new_err(
                 "rate_constants must be a N x N array where N is the number of states",
             ));
         };
 
+        if let Some(rate_coefficients) = rate_coefficients {
+            if (rate_coefficients.shape()[2] != rate_coefficients.shape()[3])
+                || (rate_coefficients.shape()[2] != rate_constants.shape()[0])
+                || (rate_coefficients.shape()[3] != rate_constants.shape()[0])
+            {
+                return Err(PyValueError::new_err(
+                    "dimensions 2 and 3 of rate_coefficents must be a N x N array where N is the number of states",
+                ));
+            };
+        }
+
         if starting_state > rate_constants.shape()[0] {
             return Err(PyValueError::new_err("starting_state must be between 0 and the N - 1, where N x N is the shape of rate_constants"));
         };
 
+        let shape = (rate_constants.shape()[0], rate_constants.shape()[1]);
         let rate_constants = rate_constants.as_array().to_owned();
-        let mut new: Vec<Vec<Rate>> = Vec::new();
-        for row in rate_constants.rows() {
-            new.push(row.to_vec());
+        let mut rcs: Vec<Rate> = Vec::new();
+        for elem in rate_constants.iter() {
+            rcs.push(*elem);
         }
 
-        let stepper = Stepper::new(0, new);
+        let stepper = Stepper::new(0, Array2D { data: rcs, shape });
         let accumulator = StepUntil::new(stepper, 1.0);
 
         Ok(PyStateMachine { accumulator })

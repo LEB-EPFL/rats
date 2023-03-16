@@ -1,5 +1,4 @@
 //! Provides concrete implementations of the Accumulate trait.
-use ndarray::ArrayView1;
 
 use crate::{Accumulate, Result, Step, Time, Transition};
 
